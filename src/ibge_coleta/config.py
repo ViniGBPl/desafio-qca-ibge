@@ -13,3 +13,7 @@ LIMITE_PADRAO = 5
 
 RAIZ_PROJETO = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = RAIZ_PROJETO / "output"
+
+# O portal fica atrás de verificação anti-bot (Cloudflare), que costuma barrar o modo headless.
+PORTAL_HEADLESS = False
+SELETOR_CONTEUDO = "div.indicador .ind-value"
