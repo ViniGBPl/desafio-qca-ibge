@@ -21,6 +21,8 @@ LIMITE_PADRAO = 5
 RAIZ_PROJETO = Path(__file__).resolve().parents[2]
 OUTPUT_DIR = RAIZ_PROJETO / "output"
 
-# O portal fica atrás de verificação anti-bot (Cloudflare), que costuma barrar o modo headless.
+# O portal fica atrás de verificação anti-bot (Cloudflare). Em modo headless o portal responde
+# 403 com a tela de verificação (testado em PA: 5 de 5 bloqueados); com o navegador visível,
+# a coleta completa de PE funcionou (185 de 185).
 PORTAL_HEADLESS = False
 SELETOR_CONTEUDO = "div.indicador .ind-value"

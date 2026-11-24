@@ -74,7 +74,9 @@ class PortalPlaywright:
             resposta = page.goto(url, wait_until="domcontentloaded")
             if resposta and resposta.status == 404:
                 raise PaginaNaoEncontradaError(f"Página não encontrada (404): {url}")
-            if resposta and resposta.status >= 400:
+            # A verificação anti-bot responde 403, mas pode se resolver sozinha em alguns
+            # segundos; nesse caso a espera pelo conteúdo decide se a página liberou ou não.
+            if resposta and resposta.status >= 400 and not self._em_verificacao_antibot(page):
                 raise PortalError(f"Erro HTTP {resposta.status} ao acessar {url}")
 
             self._aguardar_conteudo(page, url)
@@ -94,11 +96,15 @@ class PortalPlaywright:
         except PlaywrightError:
             logger.debug("Não foi possível pausar: navegador indisponível")
 
+    @staticmethod
+    def _em_verificacao_antibot(page: Page) -> bool:
+        return TITULO_VERIFICACAO_ANTIBOT in page.title()
+
     def _aguardar_conteudo(self, page: Page, url: str) -> None:
         try:
             page.wait_for_selector(SELETOR_CONTEUDO)
         except PlaywrightTimeoutError as e:
-            if TITULO_VERIFICACAO_ANTIBOT in page.title():
+            if self._em_verificacao_antibot(page):
                 raise PortalError(f"Verificação anti-bot não concluída em {url}") from e
             raise PaginaNaoEncontradaError(f"Conteúdo do município não encontrado em {url}") from e
 

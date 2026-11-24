@@ -208,7 +208,7 @@ Onde não há estado a guardar (conversões de texto, slug), foram usadas **fun�
 
 1. **Timeout ao carregar o portal.** O `page.goto` com o padrão `wait_until="load"` passava de 30 s, porque a página carrega muitos recursos externos. Solução: `domcontentloaded` + espera pelo seletor do conteúdo relevante.
 
-2. **Verificação anti-bot (Cloudflare).** Em modo headless, o HTML salvo era a tela "Just a moment...", e não a página do município. Solução: navegador visível (`PORTAL_HEADLESS = False` no `config.py`), espera pelo seletor real e detecção explícita do bloqueio como erro, em vez de salvar conteúdo inválido.
+2. **Verificação anti-bot (Cloudflare).** Em modo headless, o HTML salvo era a tela "Just a moment...", e não a página do município. Solução: navegador visível (`PORTAL_HEADLESS = False` no `config.py`), espera pelo seletor real e detecção explícita do bloqueio como erro, em vez de salvar conteúdo inválido. Depois que a espera inteligente foi implementada, o headless foi testado de novo: o portal respondeu **HTTP 403** com a tela de verificação para os 5 municípios de PA, enquanto com o navegador visível a coleta completa de PE teve 185 de 185. A decisão foi mantida, e o tratamento foi refinado: um 403 com a tela de verificação não é descartado na hora; o código espera o conteúdo (a verificação pode se resolver sozinha) e, se não liberar, registra "Verificação anti-bot não concluída" em vez de um erro HTTP genérico.
 
 3. **Redirecionamento silencioso para a página do Brasil.** URLs inexistentes não retornam 404: o portal redireciona para a página do país, que tem a mesma estrutura de indicadores. O parser chegou a gravar a área do Brasil (8.509.360,85 km²) como se fosse do município. Solução: comparar a URL final com a solicitada e tratar a diferença como "URL não encontrada".
 
@@ -240,13 +240,14 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-São **74 testes** que rodam em cerca de 1 segundo, **sem internet e sem navegador**:
+São **89 testes** que rodam em cerca de 1 segundo, **sem internet e sem navegador**:
 
 | Arquivo | O que cobre |
 |---|---|
 | `test_cidade_parser.py` | Extração a partir do **HTML real de Recife** (`tests/fixtures/recife.html`), escolha da população estimada (e não a do censo), HTML sem indicadores e campo ausente |
 | `test_ibge_api.py` | API simulada com `httpx.MockTransport`: ordenação, `microrregiao` nula, endpoint consultado, HTTP 500, JSON inválido, formato inesperado, JSON sem os campos esperados, lista vazia e timeout |
 | `test_agregados_api.py` | API de Agregados simulada: uma requisição para vários municípios, valores indisponíveis (`-`, `...`, `X`), consulta um a um quando o lote falha, JSON malformado e lista vazia sem chamar a API |
+| `test_portal.py` | `PortalPlaywright` com uma página falsa (sem abrir navegador): montagem da URL com acento, apóstrofo e hífen, HTML retornado, 404, outros erros HTTP, redirecionamento para a página do Brasil, bloqueio anti-bot (inclusive 403 com tela de verificação que se resolve ou não), página sem indicadores, timeout e uso sem abrir o navegador |
 | `test_pipeline.py` | Portal falso: coleta completa, falha em um município sem interromper os demais, registro da URL, inclusão do PIB e falha da API de Agregados sem perder a coleta |
 | `test_exporter.py` | Colunas na ordem do enunciado, colunas do PIB, remoção de duplicados, ordenação sem acento, tipos, campos vazios, aba de resumo, arquivo bloqueado (cópia com data e hora) e pasta de saída inválida |
 | `test_cli.py` | Validação da UF (número ou sigla), do limite (padrão, máximo e entradas inválidas) e exibição dos avisos no resumo |
@@ -265,7 +266,7 @@ O código também é verificado com `ruff check .` e `ruff format --check .`.
 
 ## Limitações conhecidas
 
-- **Navegador visível:** por causa da verificação anti-bot do portal, a coleta roda com o navegador aberto na tela; em servidores sem interface gráfica seria necessário um display virtual (ex.: Xvfb). O modo headless pode ser ativado em `config.py`, mas tende a ser bloqueado.
+- **Navegador visível:** por causa da verificação anti-bot do portal, a coleta roda com o navegador aberto na tela; em servidores sem interface gráfica seria necessário um display virtual (ex.: Xvfb). O modo headless pode ser ativado em `config.py`, mas nos testes foi bloqueado (HTTP 403 em todas as páginas).
 - **Dependência do HTML do portal:** a extração depende das classes `div.indicador`, `.ind-label` e `.ind-value`. Se o IBGE mudar o layout, os campos passam a vir vazios (e são registrados no log como ausentes), mas o programa não quebra nem inventa valores.
 - **Slug da URL:** a URL é montada a partir do nome do município. Municípios com grafia muito diferente no portal podem não ser encontrados; nesse caso eles aparecem no resumo como "URL não encontrada".
 - **Tempo de execução:** cada município leva alguns segundos (carregamento + pausa). Coletar um estado inteiro pode levar vários minutos.
