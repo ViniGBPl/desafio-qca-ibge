@@ -7,7 +7,7 @@ Qualquer classe que tenha os mesmos métodos satisfaz o contrato, sem herança
 from pathlib import Path
 from typing import Protocol
 
-from ibge_coleta.models import DadosPortal, Estado, Municipio, ResultadoColeta
+from ibge_coleta.models import DadosPortal, Estado, IndicadorPIB, Municipio, ResultadoColeta
 
 
 class FonteLocalidades(Protocol):
@@ -30,6 +30,12 @@ class ParserCidade(Protocol):
     """Converte o HTML da página do município em DadosPortal."""
 
     def extrair(self, html: str) -> DadosPortal: ...
+
+
+class FonteIndicadorPIB(Protocol):
+    """Fornece o PIB dos municípios (ex.: API de Agregados do IBGE)."""
+
+    def obter_pib(self, codigos_ibge: list[str]) -> dict[str, IndicadorPIB]: ...
 
 
 class Exportador(Protocol):

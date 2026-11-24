@@ -1,4 +1,5 @@
-from ibge_coleta.exceptions import PaginaNaoEncontradaError, PortalError
+from ibge_coleta.exceptions import IBGEAPIError, PaginaNaoEncontradaError, PortalError
+from ibge_coleta.models import IndicadorPIB
 from ibge_coleta.parsers.cidade_parser import CidadeParser
 from ibge_coleta.pipeline import PipelineColeta
 
@@ -65,3 +66,40 @@ def test_registro_guarda_a_url_consultada(pernambuco, html_recife, criar_municip
     )
 
     assert resultado.registros[0].url_fonte == "https://portal.fake/Recife"
+
+
+class FontePIBFake:
+    def __init__(self, resposta: dict | Exception) -> None:
+        self._resposta = resposta
+
+    def obter_pib(self, codigos_ibge):
+        if isinstance(self._resposta, Exception):
+            raise self._resposta
+        return self._resposta
+
+
+def test_adiciona_o_pib_aos_registros(pernambuco, html_recife, criar_municipio):
+    pib = IndicadorPIB(valor_mil_reais=66351305.0, ano=2023)
+    pipeline = PipelineColeta(
+        PortalFake({"Recife": html_recife}), CidadeParser(), FontePIBFake({"2611606": pib})
+    )
+
+    resultado = pipeline.executar(pernambuco, [criar_municipio("2611606", "Recife")])
+
+    assert resultado.registros[0].pib == pib
+    assert resultado.avisos == []
+
+
+def test_falha_na_api_de_agregados_nao_invalida_a_coleta(pernambuco, html_recife, criar_municipio):
+    pipeline = PipelineColeta(
+        PortalFake({"Recife": html_recife}),
+        CidadeParser(),
+        FontePIBFake(IBGEAPIError("Erro HTTP 500")),
+    )
+
+    resultado = pipeline.executar(pernambuco, [criar_municipio("2611606", "Recife")])
+
+    assert len(resultado.registros) == 1
+    assert resultado.registros[0].pib is None
+    assert resultado.registros[0].dados.gentilico == "recifense"
+    assert "Erro HTTP 500" in resultado.avisos[0]

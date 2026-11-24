@@ -33,11 +33,20 @@ class DadosPortal:
         return [f.name for f in fields(self) if getattr(self, f.name) in (None, "")]
 
 
+@dataclass(frozen=True)
+class IndicadorPIB:
+    """PIB a preços correntes do município, obtido na API de Agregados."""
+
+    valor_mil_reais: float | None
+    ano: int | None
+
+
 @dataclass
 class RegistroColeta:
     municipio: Municipio
     dados: DadosPortal
     url_fonte: str
+    pib: IndicadorPIB | None = None
 
 
 @dataclass
@@ -54,3 +63,4 @@ class ResultadoColeta:
     total_processado: int = 0
     registros: list[RegistroColeta] = field(default_factory=list)
     erros: list[ErroColeta] = field(default_factory=list)
+    avisos: list[str] = field(default_factory=list)

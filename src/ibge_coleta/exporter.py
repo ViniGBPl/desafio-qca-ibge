@@ -28,6 +28,9 @@ COLUNAS = [
     "ano_area",
     "url_fonte",
     "data_coleta",
+    # Diferencial: indicador da API de Agregados (após as 12 colunas obrigatórias)
+    "pib_mil_reais",
+    "ano_pib",
 ]
 
 TIPOS = {
@@ -42,6 +45,8 @@ TIPOS = {
     "area_km2": "Float64",
     "ano_area": "Int64",
     "url_fonte": "string",
+    "pib_mil_reais": "Float64",
+    "ano_pib": "Int64",
 }
 
 
@@ -77,6 +82,8 @@ class ExportadorExcel:
                 "ano_area": r.dados.ano_area,
                 "url_fonte": r.url_fonte,
                 "data_coleta": resultado.data_coleta,
+                "pib_mil_reais": r.pib.valor_mil_reais if r.pib else None,
+                "ano_pib": r.pib.ano if r.pib else None,
             }
             for r in resultado.registros
         ]
@@ -112,6 +119,7 @@ class ExportadorExcel:
             ("Resumo da coleta", tabelas.indicadores, "Sem dados."),
             ("Municípios com falha", tabelas.erros, "Nenhuma falha."),
             ("Campos ausentes", tabelas.ausentes, "Nenhum campo ausente."),
+            ("Avisos", tabelas.avisos, "Nenhum aviso."),
         ]
         linha = 0
         for titulo, tabela, mensagem_vazia in secoes:

@@ -3,8 +3,8 @@
 import logging
 from datetime import date
 
-from ibge_coleta.exceptions import PortalError
-from ibge_coleta.interfaces import FonteHTML, ParserCidade
+from ibge_coleta.exceptions import ColetaError, PortalError
+from ibge_coleta.interfaces import FonteHTML, FonteIndicadorPIB, ParserCidade
 from ibge_coleta.models import ErroColeta, Estado, Municipio, RegistroColeta, ResultadoColeta
 
 logger = logging.getLogger(__name__)
@@ -13,13 +13,19 @@ logger = logging.getLogger(__name__)
 class PipelineColeta:
     """Coleta os dados do portal para uma lista de municípios.
 
-    Recebe a fonte de HTML e o parser por injeção de dependência, o que permite
-    trocar o navegador real por uma implementação falsa nos testes.
+    Recebe a fonte de HTML, o parser e (opcionalmente) a fonte do PIB por injeção de
+    dependência, o que permite trocar as implementações reais por falsas nos testes.
     """
 
-    def __init__(self, fonte: FonteHTML, parser: ParserCidade) -> None:
+    def __init__(
+        self,
+        fonte: FonteHTML,
+        parser: ParserCidade,
+        fonte_pib: FonteIndicadorPIB | None = None,
+    ) -> None:
         self._fonte = fonte
         self._parser = parser
+        self._fonte_pib = fonte_pib
 
     def executar(self, estado: Estado, municipios: list[Municipio]) -> ResultadoColeta:
         resultado = ResultadoColeta(
@@ -41,6 +47,7 @@ class PipelineColeta:
                 logger.warning("%s: campos ausentes na página: %s", municipio.nome, ausentes)
             resultado.registros.append(RegistroColeta(municipio, dados, url))
 
+        self._adicionar_pib(resultado)
         logger.info(
             "UF %s: %d municípios processados, %d coletados, %d com falha",
             resultado.uf,
@@ -49,3 +56,20 @@ class PipelineColeta:
             len(resultado.erros),
         )
         return resultado
+
+    def _adicionar_pib(self, resultado: ResultadoColeta) -> None:
+        """Enriquece os registros com o PIB. Uma falha aqui não invalida a coleta principal."""
+        if self._fonte_pib is None or not resultado.registros:
+            return
+
+        codigos = [r.municipio.codigo_ibge for r in resultado.registros]
+        try:
+            pibs = self._fonte_pib.obter_pib(codigos)
+        except ColetaError as e:
+            aviso = f"PIB não obtido na API de Agregados: {e}"
+            logger.warning(aviso)
+            resultado.avisos.append(aviso)
+            return
+
+        for registro in resultado.registros:
+            registro.pib = pibs.get(registro.municipio.codigo_ibge)

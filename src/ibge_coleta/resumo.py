@@ -9,11 +9,12 @@ from ibge_coleta.models import ResultadoColeta
 
 @dataclass(frozen=True)
 class TabelasResumo:
-    """As três tabelas que compõem a aba de resumo."""
+    """As tabelas que compõem a aba de resumo."""
 
     indicadores: pd.DataFrame
     erros: pd.DataFrame
     ausentes: pd.DataFrame
+    avisos: pd.DataFrame
 
 
 class GeradorResumo:
@@ -28,12 +29,18 @@ class GeradorResumo:
             indicadores=self._indicadores(resultado),
             erros=self._erros(resultado),
             ausentes=self._ausentes(resultado),
+            avisos=pd.DataFrame({"aviso": resultado.avisos}),
         )
 
     @staticmethod
     def _indicadores(resultado: ResultadoColeta) -> pd.DataFrame:
         # Conta por código IBGE para ficar coerente com a aba de dados, que remove duplicados.
         coletados = {r.municipio.codigo_ibge for r in resultado.registros}
+        com_pib = {
+            r.municipio.codigo_ibge
+            for r in resultado.registros
+            if r.pib and r.pib.valor_mil_reais is not None
+        }
         com_ausentes = {
             r.municipio.codigo_ibge for r in resultado.registros if r.dados.campos_ausentes()
         }
@@ -44,6 +51,7 @@ class GeradorResumo:
             ("Coletados com sucesso", len(coletados)),
             ("Com falha (URL não encontrada ou erro)", len(resultado.erros)),
             ("Coletados com campos ausentes", len(com_ausentes)),
+            ("Com PIB obtido (API de Agregados)", len(com_pib)),
         ]
         return pd.DataFrame(linhas, columns=["indicador", "valor"])
 

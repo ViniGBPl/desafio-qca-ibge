@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 
+from ibge_coleta.clients.http_base import ClienteHTTPIBGE
 from ibge_coleta.config import API_BASE_URL, HTTP_TIMEOUT_S
 from ibge_coleta.exceptions import IBGEAPIError
 from ibge_coleta.models import Estado, Municipio
@@ -13,7 +14,7 @@ from ibge_coleta.utils.texto import chave_ordenacao
 logger = logging.getLogger(__name__)
 
 
-class IBGEAPIClient:
+class IBGEAPIClient(ClienteHTTPIBGE):
     """Consulta estados e municípios na API de Localidades."""
 
     def __init__(
@@ -22,17 +23,7 @@ class IBGEAPIClient:
         timeout: float = HTTP_TIMEOUT_S,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        # 'transport' permite simular respostas da API nos testes (httpx.MockTransport).
-        self._client = httpx.Client(base_url=base_url, timeout=timeout, transport=transport)
-
-    def __enter__(self) -> "IBGEAPIClient":
-        return self
-
-    def __exit__(self, *exc_info: object) -> None:
-        self.close()
-
-    def close(self) -> None:
-        self._client.close()
+        super().__init__(base_url=base_url, timeout=timeout, transport=transport)
 
     def listar_estados(self) -> list[Estado]:
         """Retorna todos os estados, ordenados por nome."""
@@ -50,24 +41,6 @@ class IBGEAPIClient:
 
         municipios = [self._converter_municipio(m, estado) for m in dados]
         return sorted(municipios, key=lambda m: chave_ordenacao(m.nome))
-
-    def _get_json(self, caminho: str) -> list[dict[str, Any]]:
-        try:
-            resposta = self._client.get(caminho)
-            resposta.raise_for_status()
-            dados = resposta.json()
-        except httpx.TimeoutException as e:
-            raise IBGEAPIError(f"Tempo esgotado ao acessar {caminho}") from e
-        except httpx.HTTPStatusError as e:
-            raise IBGEAPIError(f"Erro HTTP {e.response.status_code} em {caminho}") from e
-        except httpx.RequestError as e:
-            raise IBGEAPIError(f"Falha de conexão ao acessar {caminho}: {e}") from e
-        except ValueError as e:
-            raise IBGEAPIError(f"Resposta inválida (não é JSON) em {caminho}") from e
-
-        if not isinstance(dados, list):
-            raise IBGEAPIError(f"Formato inesperado em {caminho}: esperava uma lista")
-        return dados
 
     @staticmethod
     def _converter_municipio(dado: dict[str, Any], estado: Estado) -> Municipio:

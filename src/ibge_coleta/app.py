@@ -4,10 +4,17 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
+from ibge_coleta.clients.agregados_api import AgregadosAPIClient
 from ibge_coleta.clients.ibge_api import IBGEAPIClient
 from ibge_coleta.clients.portal import PortalPlaywright
 from ibge_coleta.exporter import ExportadorExcel
-from ibge_coleta.interfaces import Exportador, FonteHTML, FonteLocalidades, ParserCidade
+from ibge_coleta.interfaces import (
+    Exportador,
+    FonteHTML,
+    FonteIndicadorPIB,
+    FonteLocalidades,
+    ParserCidade,
+)
 from ibge_coleta.models import Estado, Municipio, ResultadoColeta
 from ibge_coleta.parsers.cidade_parser import CidadeParser
 from ibge_coleta.pipeline import PipelineColeta
@@ -29,11 +36,13 @@ class AplicacaoColeta:
         fabrica_fonte_html: FabricaFonteHTML,
         parser: ParserCidade,
         exportador: Exportador,
+        fonte_pib: FonteIndicadorPIB | None = None,
     ) -> None:
         self._localidades = localidades
         self._fabrica_fonte_html = fabrica_fonte_html
         self._parser = parser
         self._exportador = exportador
+        self._fonte_pib = fonte_pib
 
     def listar_estados(self) -> list[Estado]:
         return self._localidades.listar_estados()
@@ -45,15 +54,17 @@ class AplicacaoColeta:
         self, estado: Estado, municipios: list[Municipio]
     ) -> tuple[ResultadoColeta, Path]:
         with self._fabrica_fonte_html() as fonte:
-            resultado = PipelineColeta(fonte, self._parser).executar(estado, municipios)
+            pipeline = PipelineColeta(fonte, self._parser, self._fonte_pib)
+            resultado = pipeline.executar(estado, municipios)
         caminho = self._exportador.exportar(resultado)
         return resultado, caminho
 
 
-def criar_aplicacao(api: IBGEAPIClient) -> AplicacaoColeta:
+def criar_aplicacao(api: IBGEAPIClient, agregados: AgregadosAPIClient) -> AplicacaoColeta:
     """Raiz de composição: único ponto que conhece as implementações concretas."""
     return AplicacaoColeta(
         localidades=api,
+        fonte_pib=agregados,
         fabrica_fonte_html=PortalPlaywright,
         parser=CidadeParser(),
         exportador=ExportadorExcel(gerador_resumo=GeradorResumo()),
