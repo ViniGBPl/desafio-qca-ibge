@@ -3,9 +3,15 @@
 import logging
 from datetime import date
 
-from ibge_coleta.exceptions import ColetaError, PortalError
-from ibge_coleta.interfaces import FonteHTML, FonteIndicadorPIB, ParserCidade
-from ibge_coleta.models import ErroColeta, Estado, Municipio, RegistroColeta, ResultadoColeta
+from ibge_coleta.dominio.exceptions import ColetaError, PortalError
+from ibge_coleta.dominio.interfaces import FonteHTML, FonteIndicadorPIB, ParserCidade
+from ibge_coleta.dominio.models import (
+    ErroColeta,
+    Estado,
+    Municipio,
+    RegistroColeta,
+    ResultadoColeta,
+)
 
 logger = logging.getLogger(__name__)
 

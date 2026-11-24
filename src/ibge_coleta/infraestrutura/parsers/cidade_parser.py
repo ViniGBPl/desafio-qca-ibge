@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
-from ibge_coleta.models import DadosPortal
+from ibge_coleta.dominio.models import DadosPortal
 from ibge_coleta.utils.texto import converter_decimal_br, converter_inteiro_br, extrair_ano
 
 

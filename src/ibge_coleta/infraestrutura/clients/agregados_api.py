@@ -5,10 +5,10 @@ from typing import Any
 
 import httpx
 
-from ibge_coleta.clients.http_base import ClienteHTTPIBGE
 from ibge_coleta.config import AGREGADO_PIB, AGREGADOS_BASE_URL, HTTP_TIMEOUT_S, VARIAVEL_PIB
-from ibge_coleta.exceptions import IBGEAPIError
-from ibge_coleta.models import IndicadorPIB
+from ibge_coleta.dominio.exceptions import IBGEAPIError
+from ibge_coleta.dominio.models import IndicadorPIB
+from ibge_coleta.infraestrutura.clients.http_base import ClienteHTTPIBGE
 from ibge_coleta.utils.texto import extrair_ano
 
 logger = logging.getLogger(__name__)

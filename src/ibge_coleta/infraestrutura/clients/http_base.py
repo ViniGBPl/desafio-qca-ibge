@@ -5,7 +5,7 @@ from typing import Any, Self
 import httpx
 
 from ibge_coleta.config import HTTP_TIMEOUT_S
-from ibge_coleta.exceptions import IBGEAPIError
+from ibge_coleta.dominio.exceptions import IBGEAPIError
 
 
 class ClienteHTTPIBGE:

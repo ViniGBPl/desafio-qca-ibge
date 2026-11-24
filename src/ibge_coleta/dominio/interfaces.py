@@ -7,7 +7,7 @@ Qualquer classe que tenha os mesmos métodos satisfaz o contrato, sem herança
 from pathlib import Path
 from typing import Protocol
 
-from ibge_coleta.models import DadosPortal, Estado, IndicadorPIB, Municipio, ResultadoColeta
+from ibge_coleta.dominio.models import DadosPortal, Estado, IndicadorPIB, Municipio, ResultadoColeta
 
 
 class FonteLocalidades(Protocol):

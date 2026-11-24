@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from ibge_coleta.models import Estado, Municipio
+from ibge_coleta.dominio.models import Estado, Municipio
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

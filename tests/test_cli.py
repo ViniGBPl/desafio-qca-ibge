@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from ibge_coleta.cli import exibir_resumo, interpretar_estado, interpretar_limite
+from ibge_coleta.apresentacao.cli import exibir_resumo, interpretar_estado, interpretar_limite
 from ibge_coleta.config import LIMITE_PADRAO
-from ibge_coleta.models import Estado, ResultadoColeta
+from ibge_coleta.dominio.models import Estado, ResultadoColeta
 
 ESTADOS = [Estado("AC", "Acre", "Norte"), Estado("PE", "Pernambuco", "Nordeste")]
 

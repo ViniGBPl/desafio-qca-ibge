@@ -10,9 +10,9 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from ibge_coleta.config import OUTPUT_DIR
-from ibge_coleta.exceptions import ExportacaoError
-from ibge_coleta.models import ResultadoColeta
-from ibge_coleta.resumo import GeradorResumo, TabelasResumo
+from ibge_coleta.dominio.exceptions import ExportacaoError
+from ibge_coleta.dominio.models import ResultadoColeta
+from ibge_coleta.infraestrutura.exportacao.resumo import GeradorResumo, TabelasResumo
 from ibge_coleta.utils.texto import chave_ordenacao
 
 logger = logging.getLogger(__name__)

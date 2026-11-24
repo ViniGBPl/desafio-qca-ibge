@@ -13,8 +13,8 @@ from ibge_coleta.config import (
     PORTAL_HEADLESS,
     SELETOR_CONTEUDO,
 )
-from ibge_coleta.exceptions import PaginaNaoEncontradaError, PortalError
-from ibge_coleta.models import Municipio
+from ibge_coleta.dominio.exceptions import PaginaNaoEncontradaError, PortalError
+from ibge_coleta.dominio.models import Municipio
 from ibge_coleta.utils.texto import gerar_slug
 
 logger = logging.getLogger(__name__)

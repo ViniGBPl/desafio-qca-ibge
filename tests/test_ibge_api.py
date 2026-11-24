@@ -1,9 +1,9 @@
 import httpx
 import pytest
 
-from ibge_coleta.clients.ibge_api import IBGEAPIClient
-from ibge_coleta.exceptions import IBGEAPIError
-from ibge_coleta.models import Estado
+from ibge_coleta.dominio.exceptions import IBGEAPIError
+from ibge_coleta.dominio.models import Estado
+from ibge_coleta.infraestrutura.clients.ibge_api import IBGEAPIClient
 
 PE = Estado("PE", "Pernambuco", "Nordeste")
 UF_PE = {"sigla": "PE", "regiao": {"nome": "Nordeste"}}

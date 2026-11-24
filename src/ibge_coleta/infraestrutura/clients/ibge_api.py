@@ -5,10 +5,10 @@ from typing import Any
 
 import httpx
 
-from ibge_coleta.clients.http_base import ClienteHTTPIBGE
 from ibge_coleta.config import API_BASE_URL, HTTP_TIMEOUT_S
-from ibge_coleta.exceptions import IBGEAPIError
-from ibge_coleta.models import Estado, Municipio
+from ibge_coleta.dominio.exceptions import IBGEAPIError
+from ibge_coleta.dominio.models import Estado, Municipio
+from ibge_coleta.infraestrutura.clients.http_base import ClienteHTTPIBGE
 from ibge_coleta.utils.texto import chave_ordenacao
 
 logger = logging.getLogger(__name__)

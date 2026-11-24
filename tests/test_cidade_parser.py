@@ -1,5 +1,5 @@
-from ibge_coleta.models import DadosPortal
-from ibge_coleta.parsers.cidade_parser import CidadeParser
+from ibge_coleta.dominio.models import DadosPortal
+from ibge_coleta.infraestrutura.parsers.cidade_parser import CidadeParser
 
 
 def test_extrai_todos_os_campos_do_html_real(html_recife):

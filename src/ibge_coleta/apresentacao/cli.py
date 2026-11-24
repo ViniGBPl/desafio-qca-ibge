@@ -3,10 +3,10 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from ibge_coleta.app import AplicacaoColeta
+from ibge_coleta.aplicacao.app import AplicacaoColeta
 from ibge_coleta.config import LIMITE_PADRAO
-from ibge_coleta.exceptions import ColetaError
-from ibge_coleta.models import Estado, ResultadoColeta
+from ibge_coleta.dominio.exceptions import ColetaError
+from ibge_coleta.dominio.models import Estado, ResultadoColeta
 
 LeitorEntrada = Callable[[str], str]
 

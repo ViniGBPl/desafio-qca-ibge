@@ -3,15 +3,15 @@ from datetime import date
 import openpyxl
 import pytest
 
-from ibge_coleta.exceptions import ExportacaoError
-from ibge_coleta.exporter import COLUNAS, ExportadorExcel
-from ibge_coleta.models import (
+from ibge_coleta.dominio.exceptions import ExportacaoError
+from ibge_coleta.dominio.models import (
     DadosPortal,
     ErroColeta,
     IndicadorPIB,
     RegistroColeta,
     ResultadoColeta,
 )
+from ibge_coleta.infraestrutura.exportacao.exporter import COLUNAS, ExportadorExcel
 
 DADOS_COMPLETOS = DadosPortal("PREFEITO", "gentilico", 1588983, 2026, 218.843, 2025)
 

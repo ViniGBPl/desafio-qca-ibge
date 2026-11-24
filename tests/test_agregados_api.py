@@ -1,9 +1,9 @@
 import httpx
 import pytest
 
-from ibge_coleta.clients.agregados_api import AgregadosAPIClient
-from ibge_coleta.exceptions import IBGEAPIError
-from ibge_coleta.models import IndicadorPIB
+from ibge_coleta.dominio.exceptions import IBGEAPIError
+from ibge_coleta.dominio.models import IndicadorPIB
+from ibge_coleta.infraestrutura.clients.agregados_api import AgregadosAPIClient
 
 
 def resposta_pib(series: dict[str, dict[str, str]]) -> list[dict]:

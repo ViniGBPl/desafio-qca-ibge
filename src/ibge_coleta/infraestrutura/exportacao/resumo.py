@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from ibge_coleta.models import ResultadoColeta
+from ibge_coleta.dominio.models import ResultadoColeta
 
 
 @dataclass(frozen=True)

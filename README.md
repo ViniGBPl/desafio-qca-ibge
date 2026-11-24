@@ -120,39 +120,45 @@ Antes de implementar, os metadados da tabela foram consultados: ela **não tem a
 
 ## Arquitetura
 
-O projeto segue uma **arquitetura em camadas**: cada camada só depende das camadas abaixo dela e conversa com as outras por contratos (`Protocol`) e modelos de dados comuns.
+O projeto segue uma **arquitetura em camadas**, e cada camada é uma pasta dentro de `src/ibge_coleta/`. As camadas conversam por contratos (`Protocol`) e modelos de dados comuns, e as dependências apontam sempre para dentro, em direção ao domínio:
 
 ```
-main.py                      Ponto de entrada e raiz de composição (monta as implementações reais)
-└── cli.py                   APRESENTAÇÃO   menu de terminal (input/print)
-    └── app.py               APLICAÇÃO      casos de uso (depende só de contratos)
-        ├── pipeline.py      SERVIÇO        orquestra portal → parser por município
-        ├── exporter.py      SERVIÇO        DataFrame e Excel
-        ├── resumo.py        SERVIÇO        tabelas da aba de resumo
-        ├── parsers/         SERVIÇO        HTML → dados (BeautifulSoup)
-        └── clients/         INFRAESTRUTURA APIs (httpx) e portal (Playwright)
-
-interfaces.py   contratos entre as camadas (Protocols)
-models.py       dataclasses compartilhadas (Estado, Municipio, DadosPortal...)
-exceptions.py   hierarquia de erros da aplicação
-config.py       URLs, timeouts e limite padrão
-utils/texto.py  slug de URL, conversão de números e ordenação sem acento
+apresentacao  ──▶  aplicacao  ──▶  dominio  ◀──  infraestrutura
 ```
+
+| Camada | Pasta | Responsabilidade | Depende de |
+|---|---|---|---|
+| **Apresentação** | `apresentacao/` | Menu de terminal (`input`/`print`) | aplicação, domínio |
+| **Aplicação** | `aplicacao/` | Casos de uso e orquestração da coleta | só do domínio (contratos) |
+| **Domínio** | `dominio/` | Modelos, contratos (`Protocol`) e exceções | nada |
+| **Infraestrutura** | `infraestrutura/` | APIs (httpx), portal (Playwright), parser (BeautifulSoup) e Excel (pandas) | domínio |
+
+O `main.py` é a **raiz de composição**: o único ponto que conhece as implementações concretas e as entrega às outras camadas. Nem a aplicação nem o domínio importam httpx, Playwright, BeautifulSoup ou pandas.
 
 ```
 desafio-qca-ibge/
-├── main.py
+├── main.py                         ponto de entrada e raiz de composição
 ├── src/ibge_coleta/
-│   ├── cli.py, app.py, pipeline.py, exporter.py, resumo.py
-│   ├── interfaces.py, models.py, exceptions.py, config.py
-│   ├── clients/   http_base.py, ibge_api.py, agregados_api.py, portal.py
-│   ├── parsers/   cidade_parser.py
-│   └── utils/     texto.py
-├── scripts/salvar_fixture.py   salva o HTML de uma página para testes
-├── tests/                      testes automatizados (pytest)
-│   └── fixtures/recife.html    HTML real do portal, usado para testar o parser
-├── output/                     planilha gerada
-├── requirements.txt, requirements-dev.txt, pyproject.toml
+│   ├── apresentacao/
+│   │   └── cli.py                  menu de terminal
+│   ├── aplicacao/
+│   │   ├── app.py                  casos de uso (AplicacaoColeta)
+│   │   └── pipeline.py             coleta município a município (PipelineColeta)
+│   ├── dominio/
+│   │   ├── models.py               Estado, Municipio, DadosPortal, IndicadorPIB, ResultadoColeta...
+│   │   ├── interfaces.py           contratos: FonteLocalidades, FonteHTML, ParserCidade...
+│   │   └── exceptions.py           ColetaError e suas especializações
+│   ├── infraestrutura/
+│   │   ├── clients/                http_base.py, ibge_api.py, agregados_api.py, portal.py
+│   │   ├── parsers/                cidade_parser.py
+│   │   └── exportacao/             exporter.py (Excel), resumo.py (aba de resumo)
+│   ├── utils/texto.py              slug de URL, números no formato brasileiro, ordenação
+│   └── config.py                   URLs, timeouts, limite padrão
+├── scripts/salvar_fixture.py       salva o HTML de uma página para testes
+├── tests/                          testes automatizados (pytest)
+│   └── fixtures/recife.html        HTML real do portal, usado para testar o parser
+├── output/                         planilha gerada
+└── requirements.txt, requirements-dev.txt, pyproject.toml
 ```
 
 ### Princípios aplicados
@@ -161,7 +167,7 @@ desafio-qca-ibge/
 
 - **S — Responsabilidade única:** cada classe tem um papel: `IBGEAPIClient` só fala com a API de Localidades, `AgregadosAPIClient` só com a de Agregados, `PortalPlaywright` só navega, `CidadeParser` só interpreta HTML, `ExportadorExcel` só grava a planilha, `GeradorResumo` só monta as tabelas do resumo, `PipelineColeta` só orquestra.
 - **O — Aberto/fechado:** o parser lê todos os indicadores da página de forma genérica e busca cada campo pelo rótulo; extrair um campo novo não exige mudar a lógica de leitura do HTML.
-- **L / I — Substituição e interfaces enxutas:** os contratos em `interfaces.py` têm só os métodos necessários (`FonteHTML` tem 2, `ParserCidade` e `FonteIndicadorPIB` têm 1), e qualquer implementação que os cumpra pode ser usada no lugar da real.
+- **L / I — Substituição e interfaces enxutas:** os contratos em `dominio/interfaces.py` têm só os métodos necessários (`FonteHTML` tem 2, `ParserCidade` e `FonteIndicadorPIB` têm 1), e qualquer implementação que os cumpra pode ser usada no lugar da real.
 - **D — Inversão de dependência:** `PipelineColeta` e `AplicacaoColeta` recebem suas dependências pelo construtor e dependem de abstrações, não de Playwright ou httpx. O único lugar que conhece as classes concretas é `criar_aplicacao()`, no `main.py` (raiz de composição); a camada de aplicação (`app.py`) importa apenas contratos.
 
 **POO:**

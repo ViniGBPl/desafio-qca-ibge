@@ -4,15 +4,15 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
-from ibge_coleta.interfaces import (
+from ibge_coleta.aplicacao.pipeline import PipelineColeta
+from ibge_coleta.dominio.interfaces import (
     Exportador,
     FonteHTML,
     FonteIndicadorPIB,
     FonteLocalidades,
     ParserCidade,
 )
-from ibge_coleta.models import Estado, Municipio, ResultadoColeta
-from ibge_coleta.pipeline import PipelineColeta
+from ibge_coleta.dominio.models import Estado, Municipio, ResultadoColeta
 
 FabricaFonteHTML = Callable[[], AbstractContextManager[FonteHTML]]
 

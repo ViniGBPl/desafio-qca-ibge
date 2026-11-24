@@ -1,7 +1,7 @@
-from ibge_coleta.exceptions import IBGEAPIError, PaginaNaoEncontradaError, PortalError
-from ibge_coleta.models import IndicadorPIB
-from ibge_coleta.parsers.cidade_parser import CidadeParser
-from ibge_coleta.pipeline import PipelineColeta
+from ibge_coleta.aplicacao.pipeline import PipelineColeta
+from ibge_coleta.dominio.exceptions import IBGEAPIError, PaginaNaoEncontradaError, PortalError
+from ibge_coleta.dominio.models import IndicadorPIB
+from ibge_coleta.infraestrutura.parsers.cidade_parser import CidadeParser
 
 
 class PortalFake:
