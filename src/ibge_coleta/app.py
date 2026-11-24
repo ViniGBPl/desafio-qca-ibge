@@ -11,6 +11,7 @@ from ibge_coleta.interfaces import Exportador, FonteHTML, FonteLocalidades, Pars
 from ibge_coleta.models import Estado, Municipio, ResultadoColeta
 from ibge_coleta.parsers.cidade_parser import CidadeParser
 from ibge_coleta.pipeline import PipelineColeta
+from ibge_coleta.resumo import GeradorResumo
 
 FabricaFonteHTML = Callable[[], AbstractContextManager[FonteHTML]]
 
@@ -55,5 +56,5 @@ def criar_aplicacao(api: IBGEAPIClient) -> AplicacaoColeta:
         localidades=api,
         fabrica_fonte_html=PortalPlaywright,
         parser=CidadeParser(),
-        exportador=ExportadorExcel(),
+        exportador=ExportadorExcel(gerador_resumo=GeradorResumo()),
     )
