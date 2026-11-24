@@ -3,6 +3,7 @@ from datetime import date
 import openpyxl
 import pytest
 
+from ibge_coleta.exceptions import ExportacaoError
 from ibge_coleta.exporter import COLUNAS, ExportadorExcel
 from ibge_coleta.models import (
     DadosPortal,
@@ -91,3 +92,25 @@ def test_gera_arquivo_com_nome_da_uf_e_aba_de_resumo(resultado, tmp_path):
     assert ("Com PIB obtido (API de Agregados)", 1) in resumo
     assert any(linha[1] == "Inexistente" for linha in resumo)
     assert any(linha[1] == "Água Preta" for linha in resumo)
+
+
+def test_arquivo_bloqueado_salva_copia_e_registra_aviso(resultado, tmp_path):
+    # Uma pasta com o nome do arquivo impede a gravação, como um Excel aberto no Windows.
+    (tmp_path / "municipios_pe.xlsx").mkdir()
+
+    caminho = ExportadorExcel(pasta_saida=tmp_path).exportar(resultado)
+
+    assert caminho.name.startswith("municipios_pe_")
+    assert caminho.suffix == ".xlsx"
+    assert caminho.is_file()
+    assert "municipios_pe.xlsx" in resultado.avisos[0]
+    aba_resumo = openpyxl.load_workbook(caminho)["resumo"]
+    assert resultado.avisos[0] in [linha[0] for linha in aba_resumo.iter_rows(values_only=True)]
+
+
+def test_pasta_de_saida_invalida_gera_exportacao_error(resultado, tmp_path):
+    arquivo_no_lugar_da_pasta = tmp_path / "output"
+    arquivo_no_lugar_da_pasta.write_text("")
+
+    with pytest.raises(ExportacaoError, match="Feche o arquivo"):
+        ExportadorExcel(pasta_saida=arquivo_no_lugar_da_pasta).exportar(resultado)

@@ -50,11 +50,12 @@ class AgregadosAPIClient(ClienteHTTPIBGE):
         return indicadores
 
     def _consultar(self, codigos_ibge: list[str]) -> dict[str, IndicadorPIB]:
-        dados = self._get_json(
-            f"/{AGREGADO_PIB}/periodos/-1/variaveis/{VARIAVEL_PIB}",
-            params={"localidades": f"N6[{','.join(codigos_ibge)}]"},
-        )
-        return self._interpretar(dados)
+        caminho = f"/{AGREGADO_PIB}/periodos/-1/variaveis/{VARIAVEL_PIB}"
+        dados = self._get_json(caminho, params={"localidades": f"N6[{','.join(codigos_ibge)}]"})
+        try:
+            return self._interpretar(dados)
+        except (KeyError, TypeError, AttributeError) as e:
+            raise self._formato_inesperado(caminho, e) from e
 
     @staticmethod
     def _interpretar(dados: list[dict[str, Any]]) -> dict[str, IndicadorPIB]:

@@ -1,6 +1,7 @@
 """Consolidação e exportação dos dados para Excel com pandas (Etapa D)."""
 
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -9,6 +10,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from ibge_coleta.config import OUTPUT_DIR
+from ibge_coleta.exceptions import ExportacaoError
 from ibge_coleta.models import ResultadoColeta
 from ibge_coleta.resumo import GeradorResumo, TabelasResumo
 from ibge_coleta.utils.texto import chave_ordenacao
@@ -94,16 +96,46 @@ class ExportadorExcel:
         return df.reset_index(drop=True)
 
     def exportar(self, resultado: ResultadoColeta) -> Path:
-        df = self.montar_dataframe(resultado)
-        self._pasta_saida.mkdir(parents=True, exist_ok=True)
-        caminho = self._pasta_saida / f"municipios_{resultado.uf.lower()}.xlsx"
+        """Grava a planilha e devolve o caminho do arquivo gerado.
 
+        Se o arquivo estiver bloqueado (ex.: aberto no Excel), salva uma cópia com data e
+        hora no nome, para que a coleta não seja perdida.
+        """
+        df = self.montar_dataframe(resultado)
+        caminho = self._pasta_saida / f"municipios_{resultado.uf.lower()}.xlsx"
+        try:
+            self._pasta_saida.mkdir(parents=True, exist_ok=True)
+            self._gravar(df, resultado, caminho)
+        except OSError as e:
+            caminho = self._salvar_copia(df, resultado, caminho, e)
+
+        logger.info("Planilha gerada: %s (%d linhas)", caminho, len(df))
+        return caminho
+
+    def _salvar_copia(
+        self, df: pd.DataFrame, resultado: ResultadoColeta, original: Path, erro: OSError
+    ) -> Path:
+        copia = original.with_name(f"{original.stem}_{datetime.now():%Y%m%d_%H%M%S}.xlsx")
+        aviso = (
+            f"Não foi possível gravar {original.name} (arquivo aberto em outro programa?); "
+            f"a planilha foi salva como {copia.name}"
+        )
+        logger.warning("%s. Motivo: %s", aviso, erro)
+        resultado.avisos.append(aviso)
+        try:
+            self._gravar(df, resultado, copia)
+        except OSError as e:
+            raise ExportacaoError(
+                f"Não foi possível salvar a planilha em {original.parent}: {e}. "
+                "Feche o arquivo se estiver aberto e execute novamente."
+            ) from e
+        return copia
+
+    def _gravar(self, df: pd.DataFrame, resultado: ResultadoColeta, caminho: Path) -> None:
         with pd.ExcelWriter(caminho, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name=ABA_DADOS, index=False)
             self._formatar_data(writer.sheets[ABA_DADOS], len(df))
             self._escrever_resumo(writer, self._gerador_resumo.gerar(resultado))
-        logger.info("Planilha gerada: %s (%d linhas)", caminho, len(df))
-        return caminho
 
     @staticmethod
     def _formatar_data(planilha: Worksheet, total_linhas: int) -> None:

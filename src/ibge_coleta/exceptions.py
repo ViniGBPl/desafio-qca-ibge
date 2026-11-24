@@ -15,3 +15,7 @@ class PortalError(ColetaError):
 
 class PaginaNaoEncontradaError(PortalError):
     """A página do município não existe no portal."""
+
+
+class ExportacaoError(ColetaError):
+    """Não foi possível gravar a planilha."""

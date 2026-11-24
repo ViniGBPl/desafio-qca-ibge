@@ -123,9 +123,9 @@ Antes de implementar, os metadados da tabela foram consultados: ela **não tem a
 O projeto segue uma **arquitetura em camadas**: cada camada só depende das camadas abaixo dela e conversa com as outras por contratos (`Protocol`) e modelos de dados comuns.
 
 ```
-main.py                      Ponto de entrada
+main.py                      Ponto de entrada e raiz de composição (monta as implementações reais)
 └── cli.py                   APRESENTAÇÃO   menu de terminal (input/print)
-    └── app.py               APLICAÇÃO      casos de uso + montagem das dependências
+    └── app.py               APLICAÇÃO      casos de uso (depende só de contratos)
         ├── pipeline.py      SERVIÇO        orquestra portal → parser por município
         ├── exporter.py      SERVIÇO        DataFrame e Excel
         ├── resumo.py        SERVIÇO        tabelas da aba de resumo
@@ -162,7 +162,7 @@ desafio-qca-ibge/
 - **S — Responsabilidade única:** cada classe tem um papel: `IBGEAPIClient` só fala com a API de Localidades, `AgregadosAPIClient` só com a de Agregados, `PortalPlaywright` só navega, `CidadeParser` só interpreta HTML, `ExportadorExcel` só grava a planilha, `GeradorResumo` só monta as tabelas do resumo, `PipelineColeta` só orquestra.
 - **O — Aberto/fechado:** o parser lê todos os indicadores da página de forma genérica e busca cada campo pelo rótulo; extrair um campo novo não exige mudar a lógica de leitura do HTML.
 - **L / I — Substituição e interfaces enxutas:** os contratos em `interfaces.py` têm só os métodos necessários (`FonteHTML` tem 2, `ParserCidade` e `FonteIndicadorPIB` têm 1), e qualquer implementação que os cumpra pode ser usada no lugar da real.
-- **D — Inversão de dependência:** `PipelineColeta` e `AplicacaoColeta` recebem suas dependências pelo construtor e dependem de abstrações, não de Playwright ou httpx. O único lugar que conhece as classes concretas é `criar_aplicacao()` (raiz de composição).
+- **D — Inversão de dependência:** `PipelineColeta` e `AplicacaoColeta` recebem suas dependências pelo construtor e dependem de abstrações, não de Playwright ou httpx. O único lugar que conhece as classes concretas é `criar_aplicacao()`, no `main.py` (raiz de composição); a camada de aplicação (`app.py`) importa apenas contratos.
 
 **POO:**
 
@@ -194,6 +194,7 @@ Onde não há estado a guardar (conversões de texto, slug), foram usadas **fun�
 - **Uso responsável do portal:** pausa de 1 s entre páginas.
 - **Resumo separado da gravação:** `GeradorResumo` monta as tabelas (DataFrames) e não sabe nada de Excel; o `ExportadorExcel` recebe esse gerador pelo construtor e só grava.
 - **PIB em uma única requisição:** a API de Agregados aceita vários municípios de uma vez (`localidades=N6[cod1,cod2,...]`), então é feita uma chamada para todos, e não uma por município.
+- **A coleta nunca é perdida na gravação:** se a planilha estiver aberta em outro programa, o exportador salva uma cópia com data e hora no nome em vez de falhar.
 - **O PIB é um enriquecimento opcional:** se a API de Agregados falhar, a coleta principal continua, as colunas do PIB ficam vazias e a falha é registrada na seção "Avisos" do resumo.
 - **Testabilidade como critério de design:** o `IBGEAPIClient` aceita um `transport` do httpx opcional e o pipeline aceita qualquer `FonteHTML`, o que permite testar tudo sem rede e sem navegador.
 
@@ -221,6 +222,11 @@ Onde não há estado a guardar (conversões de texto, slug), foram usadas **fun�
 
 11. **Um código inválido derruba a consulta do lote inteiro.** Testando a API de Agregados com um código válido e um inexistente, a resposta foi erro 500 para todos. O cliente passou a consultar município a município quando o lote falha, preservando os dados dos válidos.
 
+12. **Falhas encontradas na revisão final (testes de estresse).** Simulando cenários fora do caminho feliz, três falhas apareceram e foram corrigidas, cada uma com teste:
+    - **Planilha aberta no Excel:** no Windows o arquivo fica bloqueado e a gravação falhava com traceback, perdendo minutos de coleta. Agora a planilha é salva como uma cópia com data e hora no nome (`municipios_pe_AAAAMMDD_HHMMSS.xlsx`), e o fato é registrado em "Avisos". Se nem a cópia puder ser gravada, o programa mostra uma mensagem pedindo para fechar o arquivo.
+    - **JSON da API com estrutura inesperada:** um campo ausente gerava `KeyError` sem tratamento; na API de Agregados isso derrubava o programa depois da coleta inteira. Os dois clientes agora convertem esses casos em `IBGEAPIError("Formato inesperado...")`, e o PIB segue sendo opcional.
+    - **Avisos só no Excel:** o resumo do terminal passou a exibi-los também.
+
 ## Testes
 
 ```bash
@@ -228,16 +234,16 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-São **66 testes** que rodam em cerca de 1 segundo, **sem internet e sem navegador**:
+São **74 testes** que rodam em cerca de 1 segundo, **sem internet e sem navegador**:
 
 | Arquivo | O que cobre |
 |---|---|
 | `test_cidade_parser.py` | Extração a partir do **HTML real de Recife** (`tests/fixtures/recife.html`), escolha da população estimada (e não a do censo), HTML sem indicadores e campo ausente |
-| `test_ibge_api.py` | API simulada com `httpx.MockTransport`: ordenação, `microrregiao` nula, endpoint consultado, HTTP 500, JSON inválido, formato inesperado, lista vazia e timeout |
-| `test_agregados_api.py` | API de Agregados simulada: uma requisição para vários municípios, valores indisponíveis (`-`, `...`, `X`), consulta um a um quando o lote falha e lista vazia sem chamar a API |
+| `test_ibge_api.py` | API simulada com `httpx.MockTransport`: ordenação, `microrregiao` nula, endpoint consultado, HTTP 500, JSON inválido, formato inesperado, JSON sem os campos esperados, lista vazia e timeout |
+| `test_agregados_api.py` | API de Agregados simulada: uma requisição para vários municípios, valores indisponíveis (`-`, `...`, `X`), consulta um a um quando o lote falha, JSON malformado e lista vazia sem chamar a API |
 | `test_pipeline.py` | Portal falso: coleta completa, falha em um município sem interromper os demais, registro da URL, inclusão do PIB e falha da API de Agregados sem perder a coleta |
-| `test_exporter.py` | Colunas na ordem do enunciado, colunas do PIB, remoção de duplicados, ordenação sem acento, tipos, campos vazios e aba de resumo |
-| `test_cli.py` | Validação da UF (número ou sigla) e do limite (padrão, máximo e entradas inválidas) |
+| `test_exporter.py` | Colunas na ordem do enunciado, colunas do PIB, remoção de duplicados, ordenação sem acento, tipos, campos vazios, aba de resumo, arquivo bloqueado (cópia com data e hora) e pasta de saída inválida |
+| `test_cli.py` | Validação da UF (número ou sigla), do limite (padrão, máximo e entradas inválidas) e exibição dos avisos no resumo |
 | `test_texto.py` | Slug da URL, números no formato brasileiro, ano de referência e ordenação |
 
 Para atualizar o HTML de exemplo: `python scripts/salvar_fixture.py pe recife`.

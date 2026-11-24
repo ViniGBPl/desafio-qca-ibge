@@ -79,3 +79,21 @@ def test_timeout_vira_ibge_api_error():
 
     with criar_cliente(handler) as api, pytest.raises(IBGEAPIError, match="Tempo esgotado"):
         api.listar_estados()
+
+
+@pytest.mark.parametrize(
+    ("metodo", "json_malformado"),
+    [
+        ("estados", [{"sigla": "PE"}]),  # sem 'nome' e 'regiao'
+        ("municipios", [{"nome": "Recife"}]),  # sem 'id'
+        ("municipios", ["texto no lugar de objeto"]),
+    ],
+    ids=["estado-sem-campos", "municipio-sem-id", "item-nao-objeto"],
+)
+def test_json_sem_os_campos_esperados_vira_ibge_api_error(metodo, json_malformado):
+    with criar_cliente(lambda req: httpx.Response(200, json=json_malformado)) as api:
+        with pytest.raises(IBGEAPIError, match="Formato inesperado"):
+            if metodo == "estados":
+                api.listar_estados()
+            else:
+                api.listar_municipios(PE)

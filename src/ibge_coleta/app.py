@@ -1,13 +1,9 @@
-"""Camada de aplicação: monta as dependências e expõe os casos de uso à interface."""
+"""Camada de aplicação: casos de uso expostos à interface, dependendo só de abstrações."""
 
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 
-from ibge_coleta.clients.agregados_api import AgregadosAPIClient
-from ibge_coleta.clients.ibge_api import IBGEAPIClient
-from ibge_coleta.clients.portal import PortalPlaywright
-from ibge_coleta.exporter import ExportadorExcel
 from ibge_coleta.interfaces import (
     Exportador,
     FonteHTML,
@@ -16,9 +12,7 @@ from ibge_coleta.interfaces import (
     ParserCidade,
 )
 from ibge_coleta.models import Estado, Municipio, ResultadoColeta
-from ibge_coleta.parsers.cidade_parser import CidadeParser
 from ibge_coleta.pipeline import PipelineColeta
-from ibge_coleta.resumo import GeradorResumo
 
 FabricaFonteHTML = Callable[[], AbstractContextManager[FonteHTML]]
 
@@ -58,14 +52,3 @@ class AplicacaoColeta:
             resultado = pipeline.executar(estado, municipios)
         caminho = self._exportador.exportar(resultado)
         return resultado, caminho
-
-
-def criar_aplicacao(api: IBGEAPIClient, agregados: AgregadosAPIClient) -> AplicacaoColeta:
-    """Raiz de composição: único ponto que conhece as implementações concretas."""
-    return AplicacaoColeta(
-        localidades=api,
-        fonte_pib=agregados,
-        fabrica_fonte_html=PortalPlaywright,
-        parser=CidadeParser(),
-        exportador=ExportadorExcel(gerador_resumo=GeradorResumo()),
-    )

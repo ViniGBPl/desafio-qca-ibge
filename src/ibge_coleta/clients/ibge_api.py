@@ -27,19 +27,27 @@ class IBGEAPIClient(ClienteHTTPIBGE):
 
     def listar_estados(self) -> list[Estado]:
         """Retorna todos os estados, ordenados por nome."""
-        dados = self._get_json("/estados")
-        estados = [
-            Estado(sigla=e["sigla"], nome=e["nome"], regiao=e["regiao"]["nome"]) for e in dados
-        ]
+        caminho = "/estados"
+        dados = self._get_json(caminho)
+        try:
+            estados = [
+                Estado(sigla=e["sigla"], nome=e["nome"], regiao=e["regiao"]["nome"]) for e in dados
+            ]
+        except (KeyError, TypeError, AttributeError) as e:
+            raise self._formato_inesperado(caminho, e) from e
         return sorted(estados, key=lambda e: chave_ordenacao(e.nome))
 
     def listar_municipios(self, estado: Estado) -> list[Municipio]:
         """Retorna os municípios da UF, ordenados por nome."""
-        dados = self._get_json(f"/estados/{estado.sigla}/municipios")
+        caminho = f"/estados/{estado.sigla}/municipios"
+        dados = self._get_json(caminho)
         if not dados:
             raise IBGEAPIError(f"Nenhum município retornado para a UF {estado.sigla}")
 
-        municipios = [self._converter_municipio(m, estado) for m in dados]
+        try:
+            municipios = [self._converter_municipio(m, estado) for m in dados]
+        except (KeyError, TypeError, AttributeError) as e:
+            raise self._formato_inesperado(caminho, e) from e
         return sorted(municipios, key=lambda m: chave_ordenacao(m.nome))
 
     @staticmethod

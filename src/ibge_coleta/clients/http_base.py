@@ -50,3 +50,9 @@ class ClienteHTTPIBGE:
         if not isinstance(dados, list):
             raise IBGEAPIError(f"Formato inesperado em {caminho}: esperava uma lista")
         return dados
+
+    @staticmethod
+    def _formato_inesperado(caminho: str, erro: Exception) -> IBGEAPIError:
+        """Erro padronizado para JSON válido mas sem os campos esperados."""
+        detalhe = f"campo {erro} ausente" if isinstance(erro, KeyError) else "estrutura inválida"
+        return IBGEAPIError(f"Formato inesperado na resposta de {caminho}: {detalhe}")

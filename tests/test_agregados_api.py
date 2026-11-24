@@ -83,3 +83,19 @@ def test_lista_vazia_nao_faz_requisicao():
 
     with criar_cliente(handler) as api:
         assert api.obter_pib([]) == {}
+
+
+def test_json_malformado_vira_ibge_api_error():
+    json_sem_localidade = [{"resultados": [{"series": [{"serie": {"2023": "1"}}]}]}]
+    handler = lambda req: httpx.Response(200, json=json_sem_localidade)  # noqa: E731
+
+    with criar_cliente(handler) as api, pytest.raises(IBGEAPIError, match="Formato inesperado"):
+        api.obter_pib(["2611606"])
+
+
+def test_json_malformado_em_lote_nao_derruba_o_programa():
+    json_sem_localidade = [{"resultados": [{"series": [{"serie": {"2023": "1"}}]}]}]
+    handler = lambda req: httpx.Response(200, json=json_sem_localidade)  # noqa: E731
+
+    with criar_cliente(handler) as api:
+        assert api.obter_pib(["2611606", "2609600"]) == {}

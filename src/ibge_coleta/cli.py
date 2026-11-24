@@ -63,6 +63,10 @@ def exibir_resumo(resultado: ResultadoColeta, caminho: Path) -> None:
         print("Falhas (URL não encontrada ou erro de acesso):")
         for erro in resultado.erros:
             print(f"  - {erro.municipio.nome} [{erro.municipio.codigo_ibge}]: {erro.motivo}")
+    if resultado.avisos:
+        print("Avisos:")
+        for aviso in resultado.avisos:
+            print(f"  - {aviso}")
     print(f"Planilha: {caminho}")
 
 
