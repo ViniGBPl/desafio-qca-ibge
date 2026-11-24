@@ -1,6 +1,6 @@
 # Desafio Técnico QCA — Coleta de dados de municípios do IBGE
 
-Aplicação em Python que lista os estados brasileiros pela **API de Localidades do IBGE**, deixa o usuário escolher uma UF, visita a página de cada município no portal **Cidades e Estados** e gera uma planilha Excel com os dados coletados.
+Aplicação em Python que lista os estados brasileiros pela **API de Localidades do IBGE**, deixa o usuário escolher uma UF, visita a página de cada município no portal **Cidades e Estados** e gera uma planilha Excel com os dados coletados. Como indicador adicional, a planilha traz o **PIB de cada município**, obtido na **API de Agregados**.
 
 ```
 listar estados (API) → escolher UF → consultar municípios (API) → coletar no portal (Playwright) → extrair (BeautifulSoup) → exportar Excel (pandas)
@@ -8,7 +8,7 @@ listar estados (API) → escolher UF → consultar municípios (API) → coletar
 
 | Biblioteca | Uso no projeto |
 |---|---|
-| **httpx** | Consulta à API REST de Localidades (estados e municípios) |
+| **httpx** | Consulta às APIs REST de Localidades (estados e municípios) e de Agregados (PIB) |
 | **Playwright** | Navegação real nas páginas dos municípios no portal |
 | **BeautifulSoup4** | Extração dos dados do HTML obtido pelo Playwright |
 | **pandas** | Limpeza, tipagem e exportação para Excel |
@@ -92,6 +92,10 @@ Uma linha por município, ordenada por nome, sem duplicados (chave: `codigo_ibge
 | `ano_area` | Inteiro | Portal |
 | `url_fonte` | URL consultada | Gerada a partir da UF e do nome |
 | `data_coleta` | Data (DD/MM/AAAA) | Data da execução |
+| `pib_mil_reais` | Decimal (Mil Reais) | API de Agregados *(diferencial)* |
+| `ano_pib` | Inteiro | API de Agregados *(diferencial)* |
+
+As 12 primeiras colunas são as exigidas pelo enunciado, na ordem pedida; as duas do PIB vêm depois, para não alterar essa estrutura.
 
 Números no formato brasileiro (`1.588.983`, `218,843`) são convertidos para tipos numéricos, e os anos de referência ficam em colunas separadas dos valores. **Dados ausentes ficam vazios** — nenhum valor é inventado ou preenchido com zero.
 
@@ -102,6 +106,15 @@ A planilha tem uma segunda aba que registra a execução, para que essas informa
 - **Resumo da coleta:** UF selecionada, data, municípios processados, coletados com sucesso, quantidade com falha e quantidade com campos ausentes.
 - **Municípios com falha:** código IBGE, nome, URL tentada e motivo (URL não encontrada, timeout, bloqueio...).
 - **Campos ausentes:** municípios coletados em que algum campo não foi encontrado na página, e quais campos.
+- **Avisos:** falhas que não impedem a planilha, como a API de Agregados estar indisponível.
+
+O resumo também informa quantos municípios tiveram o PIB obtido.
+
+### Indicador adicional: PIB dos municípios
+
+O PIB vem da **tabela 5938** do SIDRA ("PIB dos Municípios"), **variável 37** (Produto Interno Bruto a preços correntes, em Mil Reais), no **último ano disponível** (`periodos/-1`, hoje 2023).
+
+Antes de implementar, os metadados da tabela foram consultados: ela **não tem a variável "PIB per capita"**. Calcular o per capita aqui misturaria o PIB de 2023 com a população estimada de outro ano, gerando um número impreciso. Por isso o indicador é o PIB em si.
 
 ---
 
@@ -117,7 +130,7 @@ main.py                      Ponto de entrada
         ├── exporter.py      SERVIÇO        DataFrame e Excel
         ├── resumo.py        SERVIÇO        tabelas da aba de resumo
         ├── parsers/         SERVIÇO        HTML → dados (BeautifulSoup)
-        └── clients/         INFRAESTRUTURA API (httpx) e portal (Playwright)
+        └── clients/         INFRAESTRUTURA APIs (httpx) e portal (Playwright)
 
 interfaces.py   contratos entre as camadas (Protocols)
 models.py       dataclasses compartilhadas (Estado, Municipio, DadosPortal...)
@@ -132,7 +145,7 @@ desafio-qca-ibge/
 ├── src/ibge_coleta/
 │   ├── cli.py, app.py, pipeline.py, exporter.py, resumo.py
 │   ├── interfaces.py, models.py, exceptions.py, config.py
-│   ├── clients/   ibge_api.py, portal.py
+│   ├── clients/   http_base.py, ibge_api.py, agregados_api.py, portal.py
 │   ├── parsers/   cidade_parser.py
 │   └── utils/     texto.py
 ├── scripts/salvar_fixture.py   salva o HTML de uma página para testes
@@ -146,16 +159,16 @@ desafio-qca-ibge/
 
 **SOLID**, de forma pragmática (sem criar abstrações onde só existe uma implementação):
 
-- **S — Responsabilidade única:** cada classe tem um papel: `IBGEAPIClient` só fala com a API, `PortalPlaywright` só navega, `CidadeParser` só interpreta HTML, `ExportadorExcel` só grava a planilha, `GeradorResumo` só monta as tabelas do resumo, `PipelineColeta` só orquestra.
+- **S — Responsabilidade única:** cada classe tem um papel: `IBGEAPIClient` só fala com a API de Localidades, `AgregadosAPIClient` só com a de Agregados, `PortalPlaywright` só navega, `CidadeParser` só interpreta HTML, `ExportadorExcel` só grava a planilha, `GeradorResumo` só monta as tabelas do resumo, `PipelineColeta` só orquestra.
 - **O — Aberto/fechado:** o parser lê todos os indicadores da página de forma genérica e busca cada campo pelo rótulo; extrair um campo novo não exige mudar a lógica de leitura do HTML.
-- **L / I — Substituição e interfaces enxutas:** os contratos em `interfaces.py` têm só os métodos necessários (`FonteHTML` tem 2, `ParserCidade` tem 1), e qualquer implementação que os cumpra pode ser usada no lugar da real.
+- **L / I — Substituição e interfaces enxutas:** os contratos em `interfaces.py` têm só os métodos necessários (`FonteHTML` tem 2, `ParserCidade` e `FonteIndicadorPIB` têm 1), e qualquer implementação que os cumpra pode ser usada no lugar da real.
 - **D — Inversão de dependência:** `PipelineColeta` e `AplicacaoColeta` recebem suas dependências pelo construtor e dependem de abstrações, não de Playwright ou httpx. O único lugar que conhece as classes concretas é `criar_aplicacao()` (raiz de composição).
 
 **POO:**
 
 - **Encapsulamento:** detalhes internos ficam em atributos e métodos privados (`_client`, `_page`, `_aguardar_conteudo`); quem usa as classes só vê métodos como `listar_municipios()` e `obter_html()`.
 - **Abstração:** o pipeline pede "o HTML deste município" sem saber que existe um navegador.
-- **Herança:** hierarquia de exceções `ColetaError` → `PortalError` → `PaginaNaoEncontradaError`, permitindo tratar erros no nível certo de detalhe.
+- **Herança:** `IBGEAPIClient` e `AgregadosAPIClient` herdam de `ClienteHTTPIBGE`, que concentra a conexão httpx e o tratamento de timeout, erro HTTP, falha de conexão e JSON inválido (sem duplicar código). Também há a hierarquia de exceções `ColetaError` → `PortalError` → `PaginaNaoEncontradaError`, que permite tratar erros no nível certo de detalhe.
 - **Polimorfismo:** o pipeline funciona igual com o portal real ou com uma implementação falsa (usada nos testes, sem abrir o navegador).
 
 Onde não há estado a guardar (conversões de texto, slug), foram usadas **funções simples** em vez de classes.
@@ -180,6 +193,8 @@ Onde não há estado a guardar (conversões de texto, slug), foram usadas **fun�
 - **Tipos do pandas que aceitam vazio (`Int64`, `Float64`):** com `int` comum, um campo ausente viraria `NaN` decimal.
 - **Uso responsável do portal:** pausa de 1 s entre páginas.
 - **Resumo separado da gravação:** `GeradorResumo` monta as tabelas (DataFrames) e não sabe nada de Excel; o `ExportadorExcel` recebe esse gerador pelo construtor e só grava.
+- **PIB em uma única requisição:** a API de Agregados aceita vários municípios de uma vez (`localidades=N6[cod1,cod2,...]`), então é feita uma chamada para todos, e não uma por município.
+- **O PIB é um enriquecimento opcional:** se a API de Agregados falhar, a coleta principal continua, as colunas do PIB ficam vazias e a falha é registrada na seção "Avisos" do resumo.
 - **Testabilidade como critério de design:** o `IBGEAPIClient` aceita um `transport` do httpx opcional e o pipeline aceita qualquer `FonteHTML`, o que permite testar tudo sem rede e sem navegador.
 
 ## Problemas encontrados e como foram resolvidos
@@ -202,6 +217,10 @@ Onde não há estado a guardar (conversões de texto, slug), foram usadas **fun�
 
 9. **Resumo inconsistente com a planilha (encontrado pelos testes).** Com um município duplicado, a aba de dados removia a duplicata, mas o resumo contava o registro duas vezes. O resumo passou a contar por código IBGE, coerente com a regra de não duplicar municípios.
 
+10. **Variável de PIB per capita inexistente.** A primeira tentativa usou um código de variável que não existe na tabela 5938, e a API respondeu erro 500. A exploração dos metadados mostrou as variáveis disponíveis, e o indicador passou a ser o PIB a preços correntes (variável 37).
+
+11. **Um código inválido derruba a consulta do lote inteiro.** Testando a API de Agregados com um código válido e um inexistente, a resposta foi erro 500 para todos. O cliente passou a consultar município a município quando o lote falha, preservando os dados dos válidos.
+
 ## Testes
 
 ```bash
@@ -209,14 +228,15 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-São **56 testes** que rodam em cerca de 1 segundo, **sem internet e sem navegador**:
+São **66 testes** que rodam em cerca de 1 segundo, **sem internet e sem navegador**:
 
 | Arquivo | O que cobre |
 |---|---|
 | `test_cidade_parser.py` | Extração a partir do **HTML real de Recife** (`tests/fixtures/recife.html`), escolha da população estimada (e não a do censo), HTML sem indicadores e campo ausente |
 | `test_ibge_api.py` | API simulada com `httpx.MockTransport`: ordenação, `microrregiao` nula, endpoint consultado, HTTP 500, JSON inválido, formato inesperado, lista vazia e timeout |
-| `test_pipeline.py` | Portal falso: coleta completa, falha em um município sem interromper os demais e registro da URL consultada |
-| `test_exporter.py` | Colunas na ordem do enunciado, remoção de duplicados, ordenação sem acento, tipos, campos vazios e aba de resumo |
+| `test_agregados_api.py` | API de Agregados simulada: uma requisição para vários municípios, valores indisponíveis (`-`, `...`, `X`), consulta um a um quando o lote falha e lista vazia sem chamar a API |
+| `test_pipeline.py` | Portal falso: coleta completa, falha em um município sem interromper os demais, registro da URL, inclusão do PIB e falha da API de Agregados sem perder a coleta |
+| `test_exporter.py` | Colunas na ordem do enunciado, colunas do PIB, remoção de duplicados, ordenação sem acento, tipos, campos vazios e aba de resumo |
 | `test_cli.py` | Validação da UF (número ou sigla) e do limite (padrão, máximo e entradas inválidas) |
 | `test_texto.py` | Slug da URL, números no formato brasileiro, ano de referência e ordenação |
 
@@ -229,7 +249,7 @@ O código também é verificado com `ruff check .` e `ruff format --check .`.
 - ✅ **Testes automatizados** da extração a partir de um HTML de exemplo (e das demais camadas).
 - ✅ **Continuar com os demais municípios quando uma página falhar**, registrando o motivo.
 - ✅ **Aba adicional no Excel** com resumo da coleta, UF selecionada, erros e dados ausentes.
-- ⬜ Indicador adicional da API de Agregados (não implementado).
+- ✅ **Indicador adicional da API de Agregados:** PIB a preços correntes de cada município.
 
 ## Limitações conhecidas
 
@@ -238,6 +258,7 @@ O código também é verificado com `ruff check .` e `ruff format --check .`.
 - **Slug da URL:** a URL é montada a partir do nome do município. Municípios com grafia muito diferente no portal podem não ser encontrados; nesse caso eles aparecem no resumo como "URL não encontrada".
 - **Tempo de execução:** cada município leva alguns segundos (carregamento + pausa). Coletar um estado inteiro pode levar vários minutos.
 - **Dados ausentes:** quando um campo não existe na página de um município, a célula fica vazia, o aviso `"<município>: campos ausentes na página: [...]"` é exibido no log e o município é listado na aba `resumo`. Nos testes realizados (PE, TO, BA, AL), todos os campos estavam disponíveis.
+- **PIB:** é o valor nominal (a preços correntes) do último ano publicado pelo IBGE, que tem alguns anos de defasagem em relação à data da coleta.
 - **Dados dinâmicos:** os valores (prefeito, população estimada e anos de referência) são os exibidos no portal na data da coleta e podem mudar com atualizações do IBGE.
 
 ## Fontes
@@ -246,3 +267,5 @@ O código também é verificado com `ruff check .` e `ruff format --check .`.
   - Estados: `https://servicodados.ibge.gov.br/api/v1/localidades/estados`
   - Municípios por UF: `https://servicodados.ibge.gov.br/api/v1/localidades/estados/{UF}/municipios`
 - Portal Cidades e Estados — https://www.ibge.gov.br/cidades-e-estados
+- API de Agregados do IBGE — https://servicodados.ibge.gov.br/api/docs/agregados?versao=3
+  - PIB: `https://servicodados.ibge.gov.br/api/v3/agregados/5938/periodos/-1/variaveis/37?localidades=N6[{códigos}]`
