@@ -2,33 +2,12 @@
 
 import logging
 from datetime import date
-from typing import Protocol
 
 from ibge_coleta.exceptions import PortalError
-from ibge_coleta.models import (
-    DadosPortal,
-    ErroColeta,
-    Estado,
-    Municipio,
-    RegistroColeta,
-    ResultadoColeta,
-)
+from ibge_coleta.interfaces import FonteHTML, ParserCidade
+from ibge_coleta.models import ErroColeta, Estado, Municipio, RegistroColeta, ResultadoColeta
 
 logger = logging.getLogger(__name__)
-
-
-class FonteHTML(Protocol):
-    """Qualquer objeto capaz de montar a URL de um município e devolver seu HTML."""
-
-    def montar_url(self, municipio: Municipio) -> str: ...
-
-    def obter_html(self, url: str) -> str: ...
-
-
-class ParserCidade(Protocol):
-    """Qualquer objeto capaz de converter o HTML do município em DadosPortal."""
-
-    def extrair(self, html: str) -> DadosPortal: ...
 
 
 class PipelineColeta:
@@ -43,26 +22,29 @@ class PipelineColeta:
         self._parser = parser
 
     def executar(self, estado: Estado, municipios: list[Municipio]) -> ResultadoColeta:
-        resultado = ResultadoColeta(uf=estado.sigla, data_coleta=date.today())
-        total = len(municipios)
+        resultado = ResultadoColeta(
+            uf=estado.sigla, data_coleta=date.today(), total_processado=len(municipios)
+        )
 
         for posicao, municipio in enumerate(municipios, start=1):
             url = self._fonte.montar_url(municipio)
-            logger.info("Coletando %s (%d/%d)", municipio.nome, posicao, total)
+            logger.info("Coletando %s (%d/%d)", municipio.nome, posicao, len(municipios))
             try:
                 html = self._fonte.obter_html(url)
             except PortalError as e:  # 404, redirecionamento, timeout, anti-bot...
-                logger.warning("%s", e)
-                resultado.erros.append(ErroColeta(municipio.nome, url, str(e)))
+                logger.warning("%s: %s", municipio.nome, e)
+                resultado.erros.append(ErroColeta(municipio, url, str(e)))
                 continue
 
             dados = self._parser.extrair(html)
+            if ausentes := dados.campos_ausentes():
+                logger.warning("%s: campos ausentes na página: %s", municipio.nome, ausentes)
             resultado.registros.append(RegistroColeta(municipio, dados, url))
 
         logger.info(
             "UF %s: %d municípios processados, %d coletados, %d com falha",
             resultado.uf,
-            total,
+            resultado.total_processado,
             len(resultado.registros),
             len(resultado.erros),
         )

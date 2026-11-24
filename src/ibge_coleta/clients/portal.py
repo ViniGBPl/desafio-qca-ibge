@@ -85,7 +85,14 @@ class PortalPlaywright:
         except PlaywrightError as e:
             raise PortalError(f"Falha do navegador ao acessar {url}: {e}") from e
         finally:
-            page.wait_for_timeout(self._pausa_ms)  # uso responsável do portal
+            self._pausar(page)
+
+    def _pausar(self, page: Page) -> None:
+        """Pausa entre páginas (uso responsável do portal); nunca deve mascarar o erro real."""
+        try:
+            page.wait_for_timeout(self._pausa_ms)
+        except PlaywrightError:
+            logger.debug("Não foi possível pausar: navegador indisponível")
 
     def _aguardar_conteudo(self, page: Page, url: str) -> None:
         try:

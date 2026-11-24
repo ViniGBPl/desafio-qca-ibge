@@ -1,14 +1,11 @@
 """Extração dos dados do município a partir do HTML do portal (Etapa C)."""
 
-import logging
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 
 from ibge_coleta.models import DadosPortal
 from ibge_coleta.utils.texto import converter_decimal_br, converter_inteiro_br, extrair_ano
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -23,8 +20,10 @@ class Indicador:
 class CidadeParser:
     """Converte o HTML da página do município em DadosPortal.
 
-    Os campos são localizados pelo rótulo exato do indicador, e não pela posição
-    do bloco na página. Para extrair um campo novo, basta adicionar seu rótulo.
+    Todos os blocos 'div.indicador' são lidos para um dicionário rótulo -> Indicador,
+    e cada campo é buscado pelo rótulo exato (não pela posição na página). Assim, a
+    leitura do HTML é genérica; um campo novo exige só o rótulo, o atributo em
+    DadosPortal e a coluna no exportador. Campos ausentes ficam como None.
     """
 
     ROTULO_PREFEITO = "Prefeito"
@@ -40,7 +39,7 @@ class CidadeParser:
         populacao = indicadores.get(self.ROTULO_POPULACAO)
         area = indicadores.get(self.ROTULO_AREA)
 
-        dados = DadosPortal(
+        return DadosPortal(
             prefeito=prefeito.valor if prefeito else None,
             gentilico=gentilico.valor if gentilico else None,
             populacao_estimada=converter_inteiro_br(populacao.valor) if populacao else None,
@@ -48,8 +47,6 @@ class CidadeParser:
             area_km2=converter_decimal_br(area.valor) if area else None,
             ano_area=area.ano if area else None,
         )
-        self._registrar_ausentes(dados)
-        return dados
 
     def _mapear_indicadores(self, html: str) -> dict[str, Indicador]:
         soup = BeautifulSoup(html, "html.parser")
@@ -75,9 +72,3 @@ class CidadeParser:
         """Texto do próprio elemento, sem a unidade (<span>) e o ano (<small>)."""
         partes = [str(filho) for filho in tag.children if isinstance(filho, NavigableString)]
         return " ".join("".join(partes).split())
-
-    @staticmethod
-    def _registrar_ausentes(dados: DadosPortal) -> None:
-        for campo, valor in vars(dados).items():
-            if valor in (None, ""):
-                logger.warning("Campo '%s' não encontrado na página", campo)

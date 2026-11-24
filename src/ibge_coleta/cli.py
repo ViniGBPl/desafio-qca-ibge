@@ -1,15 +1,12 @@
-"""Menu de terminal: escolha da UF e do limite de municípios."""
+"""Camada de apresentação: menu de terminal para escolher a UF e o limite."""
 
 from collections.abc import Callable
+from pathlib import Path
 
-from ibge_coleta.clients.ibge_api import IBGEAPIClient
-from ibge_coleta.clients.portal import PortalPlaywright
+from ibge_coleta.app import AplicacaoColeta
 from ibge_coleta.config import LIMITE_PADRAO
 from ibge_coleta.exceptions import ColetaError
-from ibge_coleta.exporter import ExportadorExcel
-from ibge_coleta.models import Estado, Municipio, ResultadoColeta
-from ibge_coleta.parsers.cidade_parser import CidadeParser
-from ibge_coleta.pipeline import PipelineColeta
+from ibge_coleta.models import Estado, ResultadoColeta
 
 LeitorEntrada = Callable[[str], str]
 
@@ -58,40 +55,30 @@ def escolher_limite(total: int, ler: LeitorEntrada = input) -> int:
         print("Quantidade inválida. Digite um número inteiro maior que zero.")
 
 
-def selecionar_municipios(api: IBGEAPIClient) -> tuple[Estado, list[Municipio]]:
-    """Fluxo completo de seleção: UF -> municípios -> limite."""
-    estado = escolher_estado(api.listar_estados())
-    municipios = api.listar_municipios(estado)
-    limite = escolher_limite(len(municipios))
-    return estado, municipios[:limite]
-
-
-def exibir_resumo(resultado: ResultadoColeta, total: int, caminho: str) -> None:
+def exibir_resumo(resultado: ResultadoColeta, caminho: Path) -> None:
     print(f"\nUF escolhida: {resultado.uf}")
-    print(f"Municípios processados: {total}")
+    print(f"Municípios processados: {resultado.total_processado}")
     print(f"Coletados com sucesso: {len(resultado.registros)}")
     if resultado.erros:
         print("Falhas (URL não encontrada ou erro de acesso):")
         for erro in resultado.erros:
-            print(f"  - {erro.municipio}: {erro.motivo}")
+            print(f"  - {erro.municipio.nome} [{erro.municipio.codigo_ibge}]: {erro.motivo}")
     print(f"Planilha: {caminho}")
 
 
-def main() -> int:
+def executar_menu(app: AplicacaoColeta) -> int:
+    """Conduz a interação com o usuário. Retorna o código de saída do programa."""
     try:
-        with IBGEAPIClient() as api:
-            estado, municipios = selecionar_municipios(api)
-
-        with PortalPlaywright() as portal:
-            resultado = PipelineColeta(portal, CidadeParser()).executar(estado, municipios)
-
-        caminho = ExportadorExcel().exportar(resultado)
+        estado = escolher_estado(app.listar_estados())
+        municipios = app.listar_municipios(estado)
+        selecionados = municipios[: escolher_limite(len(municipios))]
+        resultado, caminho = app.coletar_e_exportar(estado, selecionados)
     except ColetaError as e:
         print(f"\nErro: {e}")
         return 1
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         print("\nExecução cancelada pelo usuário.")
         return 130
 
-    exibir_resumo(resultado, len(municipios), str(caminho))
+    exibir_resumo(resultado, caminho)
     return 0

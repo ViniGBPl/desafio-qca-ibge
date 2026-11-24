@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 
 import pandas as pd
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 from ibge_coleta.config import OUTPUT_DIR
 from ibge_coleta.models import ResultadoColeta
@@ -41,6 +43,10 @@ TIPOS = {
 }
 
 
+ABA_DADOS = "municipios"
+FORMATO_DATA = "DD/MM/YYYY"
+
+
 class ExportadorExcel:
     """Monta o DataFrame da coleta e grava em output/municipios_{uf}.xlsx."""
 
@@ -76,6 +82,15 @@ class ExportadorExcel:
         self._pasta_saida.mkdir(parents=True, exist_ok=True)
         caminho = self._pasta_saida / f"municipios_{resultado.uf.lower()}.xlsx"
 
-        df.to_excel(caminho, sheet_name="municipios", index=False)
+        with pd.ExcelWriter(caminho, engine="openpyxl") as writer:
+            df.to_excel(writer, sheet_name=ABA_DADOS, index=False)
+            self._formatar_data(writer.sheets[ABA_DADOS], len(df))
         logger.info("Planilha gerada: %s (%d linhas)", caminho, len(df))
         return caminho
+
+    @staticmethod
+    def _formatar_data(planilha: Worksheet, total_linhas: int) -> None:
+        """Exibe data_coleta só como data (sem 00:00:00)."""
+        coluna = get_column_letter(COLUNAS.index("data_coleta") + 1)
+        for linha in range(2, total_linhas + 2):
+            planilha[f"{coluna}{linha}"].number_format = FORMATO_DATA

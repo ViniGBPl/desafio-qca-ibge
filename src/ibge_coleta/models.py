@@ -1,6 +1,6 @@
 """Modelos de dados compartilhados entre as camadas."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import date
 
 
@@ -28,6 +28,10 @@ class DadosPortal:
     area_km2: float | None = None
     ano_area: int | None = None
 
+    def campos_ausentes(self) -> list[str]:
+        """Nomes dos campos que não foram encontrados na página."""
+        return [f.name for f in fields(self) if getattr(self, f.name) in (None, "")]
+
 
 @dataclass
 class RegistroColeta:
@@ -38,7 +42,7 @@ class RegistroColeta:
 
 @dataclass
 class ErroColeta:
-    municipio: str
+    municipio: Municipio
     url: str
     motivo: str
 
@@ -47,5 +51,6 @@ class ErroColeta:
 class ResultadoColeta:
     uf: str
     data_coleta: date
+    total_processado: int = 0
     registros: list[RegistroColeta] = field(default_factory=list)
     erros: list[ErroColeta] = field(default_factory=list)
