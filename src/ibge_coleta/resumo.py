@@ -32,14 +32,18 @@ class GeradorResumo:
 
     @staticmethod
     def _indicadores(resultado: ResultadoColeta) -> pd.DataFrame:
-        com_ausentes = sum(1 for r in resultado.registros if r.dados.campos_ausentes())
+        # Conta por código IBGE para ficar coerente com a aba de dados, que remove duplicados.
+        coletados = {r.municipio.codigo_ibge for r in resultado.registros}
+        com_ausentes = {
+            r.municipio.codigo_ibge for r in resultado.registros if r.dados.campos_ausentes()
+        }
         linhas = [
             ("UF selecionada", resultado.uf),
             ("Data da coleta", resultado.data_coleta.strftime("%d/%m/%Y")),
             ("Municípios processados", resultado.total_processado),
-            ("Coletados com sucesso", len(resultado.registros)),
+            ("Coletados com sucesso", len(coletados)),
             ("Com falha (URL não encontrada ou erro)", len(resultado.erros)),
-            ("Coletados com campos ausentes", com_ausentes),
+            ("Coletados com campos ausentes", len(com_ausentes)),
         ]
         return pd.DataFrame(linhas, columns=["indicador", "valor"])
 

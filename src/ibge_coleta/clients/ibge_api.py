@@ -16,8 +16,14 @@ logger = logging.getLogger(__name__)
 class IBGEAPIClient:
     """Consulta estados e municípios na API de Localidades."""
 
-    def __init__(self, base_url: str = API_BASE_URL, timeout: float = HTTP_TIMEOUT_S) -> None:
-        self._client = httpx.Client(base_url=base_url, timeout=timeout)
+    def __init__(
+        self,
+        base_url: str = API_BASE_URL,
+        timeout: float = HTTP_TIMEOUT_S,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        # 'transport' permite simular respostas da API nos testes (httpx.MockTransport).
+        self._client = httpx.Client(base_url=base_url, timeout=timeout, transport=transport)
 
     def __enter__(self) -> "IBGEAPIClient":
         return self
