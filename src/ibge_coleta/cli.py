@@ -3,9 +3,13 @@
 from collections.abc import Callable
 
 from ibge_coleta.clients.ibge_api import IBGEAPIClient
+from ibge_coleta.clients.portal import PortalPlaywright
 from ibge_coleta.config import LIMITE_PADRAO
 from ibge_coleta.exceptions import ColetaError
-from ibge_coleta.models import Estado, Municipio
+from ibge_coleta.exporter import ExportadorExcel
+from ibge_coleta.models import Estado, Municipio, ResultadoColeta
+from ibge_coleta.parsers.cidade_parser import CidadeParser
+from ibge_coleta.pipeline import PipelineColeta
 
 LeitorEntrada = Callable[[str], str]
 
@@ -62,10 +66,26 @@ def selecionar_municipios(api: IBGEAPIClient) -> tuple[Estado, list[Municipio]]:
     return estado, municipios[:limite]
 
 
+def exibir_resumo(resultado: ResultadoColeta, total: int, caminho: str) -> None:
+    print(f"\nUF escolhida: {resultado.uf}")
+    print(f"Municípios processados: {total}")
+    print(f"Coletados com sucesso: {len(resultado.registros)}")
+    if resultado.erros:
+        print("Falhas (URL não encontrada ou erro de acesso):")
+        for erro in resultado.erros:
+            print(f"  - {erro.municipio}: {erro.motivo}")
+    print(f"Planilha: {caminho}")
+
+
 def main() -> int:
     try:
         with IBGEAPIClient() as api:
             estado, municipios = selecionar_municipios(api)
+
+        with PortalPlaywright() as portal:
+            resultado = PipelineColeta(portal, CidadeParser()).executar(estado, municipios)
+
+        caminho = ExportadorExcel().exportar(resultado)
     except ColetaError as e:
         print(f"\nErro: {e}")
         return 1
@@ -73,9 +93,5 @@ def main() -> int:
         print("\nExecução cancelada pelo usuário.")
         return 130
 
-    print(f"\nUF escolhida: {estado.nome} ({estado.sigla})")
-    print(f"Municípios selecionados ({len(municipios)}):")
-    for m in municipios:
-        print(f"  - {m.nome} [{m.codigo_ibge}]")
-    # Próximas etapas (portal, parser e exportação) entram aqui via pipeline.
+    exibir_resumo(resultado, len(municipios), str(caminho))
     return 0
